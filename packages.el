@@ -11,24 +11,6 @@
 ;; Fragtog automatic latex preview
 (package! org-fragtog)
 
-
-;; Eat
-(package! eat)
-
-;; Claude code
-(package! claudemacs
-  :recipe (:host github :repo "cpoile/claudemacs"))
-
-;; Exwm
-(package! exwm)
-
-;; Exwm evil
-(package! exwm-evil)
-
-;; Evil firefox
-(package! exwm-evil :recipe
-  (:host github :repo "LemonBreezes/exwm-evil"))
-
 ;; Polymode (required for EIN)
 (package! polymode)
 
