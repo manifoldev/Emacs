@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# Start EXWM via startx
-
-# Merge Xresources (optional)
-[[ -f "$HOME/.Xresources" ]] && xrdb -merge "$HOME/.Xresources"
-
-exec dbus-run-session emacs -mm --debug-init
-
