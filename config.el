@@ -57,6 +57,43 @@
   (buffer-name (or buffer (current-buffer))))
 
 
+;; Image orgmode
+(after! org-download
+        (setq org-download-method 'directory)
+        (setq org-download-image-dir (concat (file-name-sans-extension (buffer-file-name)) "-img"))
+        (setq org-download-image-org-width 600)
+        (setq org-download-link-format "[[file:%s]]\n"
+          org-download-abbreviate-filename-function #'file-relative-name)
+        (setq org-download-link-format-function #'org-download-link-format-function-default))
+
+
+;; Spell-check: use Hunspell with US English + Mexican Spanish simultaneously
+;; Requires hunspell and dictionaries installed (e.g., en_US, es_MX).
+;; On Debian/Ubuntu:   sudo apt install hunspell hunspell-en-us hunspell-es-mx
+;; On Arch:            sudo pacman -S hunspell hunspell-en_us hunspell-es_mx
+;; On macOS (Homebrew): brew install hunspell && brew install hunspell-en-us hunspell-es
+;; If es_MX isn't available on macOS, install the Spanish pack that includes it.
+(setq ispell-program-name "hunspell"
+      ispell-dictionary "en_US,es_MX")
+
+;; Provide an explicit entry so Emacs recognizes the combined dictionary name
+(add-to-list 'ispell-local-dictionary-alist
+             '("en_US,es_MX"
+               "[[:alpha:]]" "[^[:alpha:]]" "[']" t
+               ("-d" "en_US,es_MX") nil utf-8))
+
+(after! ispell
+  (when (fboundp 'ispell-set-spellchecker-params)
+    (ispell-set-spellchecker-params)))
+
+;; Ensure Flyspell switches to the multi-dictionary on enable
+(defun +my-flyspell-use-multi-dict ()
+  (when (and (boundp 'ispell-program-name)
+             (stringp ispell-program-name)
+             (string-match-p "hunspell" ispell-program-name))
+    (ignore-errors (ispell-change-dictionary "en_US,es_MX" t))))
+(add-hook 'flyspell-mode-hook #'+my-flyspell-use-multi-dict)
+
 ;; Whenever you reconfigure a package, make sure to wrap your config in an
 ;; `after!' block, otherwise Doom's defaults may override your settings. E.g.
 ;;
