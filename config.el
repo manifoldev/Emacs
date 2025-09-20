@@ -76,13 +76,21 @@
 (setq ispell-program-name "hunspell"
       ispell-dictionary "en_US,es_MX")
 
-;; Provide an explicit entry so Emacs recognizes the combined dictionary name
-(add-to-list 'ispell-local-dictionary-alist
-             '("en_US,es_MX"
-               "[[:alpha:]]" "[^[:alpha:]]" "[']" t
-               ("-d" "en_US,es_MX") nil utf-8))
-
 (after! ispell
+  (let ((multi-dict '("en_US,es_MX"
+                      "[[:alpha:]]" "[^[:alpha:]]" "[']" t
+                      ("-d" "en_US,es_MX") nil utf-8)))
+    (setq ispell-hunspell-dictionary-alist
+          (cons multi-dict
+                (assoc-delete-all "en_US,es_MX" ispell-hunspell-dictionary-alist)))
+    (setq ispell-local-dictionary-alist
+          (cons multi-dict
+                (assoc-delete-all "en_US,es_MX" ispell-local-dictionary-alist)))
+    (setq ispell-dictionary-alist
+          (cons multi-dict
+                (assoc-delete-all "en_US,es_MX" ispell-dictionary-alist))))
+  ;; Ensure hunspell is always asked for UTF-8 so iconv never receives NIL
+  (setq ispell-cmd-args (delete-dups (append '("-i" "utf-8") ispell-cmd-args)))
   (when (fboundp 'ispell-set-spellchecker-params)
     (ispell-set-spellchecker-params)))
 
