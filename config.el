@@ -39,7 +39,15 @@
    'org-babel-load-languages
    '((emacs-lisp . t)
      (python . t)
-     (jupyter-python . t)))
+     (jupyter-python . t)
+     (lean4 . t)))
+  (dolist (entry '(("lean4" . lean4)
+                   ("lean" . lean4)))
+    (setf (alist-get (car entry) org-src-lang-modes nil nil #'equal)
+          (cdr entry)))
+  (setq org-src-fontify-natively t
+        org-src-tab-acts-natively t
+        org-src-preserve-indentation t)
   
   (setq org-confirm-babel-evaluate nil)
   (setq org-babel-python-command "python")
@@ -50,6 +58,95 @@
   
   ;; Force reload ob-python
   (require 'ob-python))
+
+(after! ob-lean4
+  (require 'cl-lib)
+  (require 'subr-x)
+  (require 'lean4-mode nil t)
+  (defvar +org-babel-lean4-command "lean"
+    "Shell command used by default to execute Lean 4 source blocks.")
+
+  (defvar org-babel-lean4--session-code (make-hash-table :test 'equal)
+    "Hash map of Lean 4 session names to accumulated source code.")
+
+  ;; Provide sensible defaults for Lean 4 blocks (evaluate for results + output).
+  (setq org-babel-default-header-args:lean4
+        '((:results . "output verbatim replace")
+          (:exports . "both")
+          (:session . "lean4")))
+
+  (defun org-babel-lean4-clear-session (&optional session)
+    "Clear stored Lean 4 SESSION state.
+If SESSION is nil, clear all sessions."
+    (if (or (null session) (equal session "all"))
+        (clrhash org-babel-lean4--session-code)
+      (remhash session org-babel-lean4--session-code)))
+
+  (defun org-babel-lean4--normalize-session (session)
+    "Return a canonical session name STRING or nil."
+    (pcase session
+      ((or `nil 'none "none") nil)
+      ((or `t "*lean4*") "lean4")
+      ((pred stringp) session)
+      (_ (format "%s" session))))
+
+  ;; Re-implement the executor to support custom commands and extra args.
+  (defun org-babel-execute:lean4 (body params)
+    "Execute a Lean 4 source block via org-babel.
+Supports optional header arguments :cmd (string) to override the shell
+command used to run Lean, and :args (list/string) for additional CLI args."
+    (let* ((cmd-header (or (cdr (assq :cmd params))
+                           (cdr (assq :command params))
+                           +org-babel-lean4-command))
+           (cmd (if (stringp cmd-header)
+                    cmd-header
+                  +org-babel-lean4-command))
+           (extra-args (cdr (assq :args params)))
+           (session (org-babel-lean4--normalize-session (cdr (assq :session params))))
+           (reset-flag (cdr (assq :reset params)))
+           (prologue (or (cdr (assq :prologue params)) ""))
+           (epilogue (or (cdr (assq :epilogue params)) ""))
+           (stored-code (if session
+                            (progn
+                              (when reset-flag
+                                (org-babel-lean4-clear-session session))
+                              (gethash session org-babel-lean4--session-code ""))
+                          ""))
+           (segments (delq nil
+                           (list (unless (string-empty-p stored-code) stored-code)
+                                 (let ((trimmed (string-trim prologue)))
+                                   (unless (string-empty-p trimmed) trimmed))
+                                 (string-trim-right body)
+                                 (let ((trimmed (string-trim epilogue)))
+                                   (unless (string-empty-p trimmed) trimmed)))))
+           (source (if segments (string-join segments "\n\n") ""))
+           (args-list (append (list cmd)
+                              (cl-typecase extra-args
+                                (null nil)
+                                (string (list extra-args))
+                                (list extra-args)
+                                (t (list (format "%s" extra-args))))))
+           (lean-file (org-babel-temp-file "lean4-" ".lean")))
+      (with-temp-file lean-file
+        (insert source)
+        (unless (string-suffix-p "\n" source)
+          (insert "\n")))
+      (let ((result (org-babel-eval
+                     (mapconcat #'identity
+                                (append args-list
+                                        (list (org-babel-process-file-name lean-file)))
+                                " ")
+                     "")))
+        (when session
+          (puthash session source org-babel-lean4--session-code))
+        result)))
+
+  (defun +lean4--enable-lsp-in-org-src ()
+    "Start LSP when editing Lean 4 src blocks via org-edit-special."
+    (when (and (derived-mode-p 'lean4-mode)
+               (fboundp 'lsp!))
+      (lsp!)))
+  (add-hook 'org-src-mode-hook #'+lean4--enable-lsp-in-org-src))
 
 ;; EIN polymode fix
 (defun pm--visible-buffer-name (&optional buffer)
@@ -101,6 +198,21 @@
              (string-match-p "hunspell" ispell-program-name))
     (ignore-errors (ispell-change-dictionary "en_US,es_MX" t))))
 (add-hook 'flyspell-mode-hook #'+my-flyspell-use-multi-dict)
+
+;; Lean 4 via lean4-mode + LSP (Lean 3 module disabled in init.el)
+(use-package! lean4-mode
+  :mode "\\.lean\\'"
+  :hook (lean4-mode . lsp!)
+  :config
+  ;; `lsp!` sets up lean-language-server when :tools lsp is enabled.
+  (setq lean4-rootdir nil) ; use Lean from PATH (e.g., `lean` or `lake env`)
+  (set-company-backend! 'lean4-mode '(company-capf))
+  (map! :localleader
+        :map lean4-mode-map
+        "=" #'lsp-format-buffer
+        "l" #'lean4-switch-to-info-buffer
+        "h" #'lean4-toggle-hole-state
+        "r" #'lean4-refresh-file-dependencies))
 
 ;; Whenever you reconfigure a package, make sure to wrap your config in an
 ;; `after!' block, otherwise Doom's defaults may override your settings. E.g.

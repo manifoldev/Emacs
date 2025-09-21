@@ -17,6 +17,18 @@
 ;; Httpd server
 (package! simple-httpd)
 
+;; Lean
+(package! lean4-mode
+  :recipe (:host github
+           :repo "leanprover-community/lean4-mode"
+           :files ("*.el" "data"))); Lean
+
+;; Org-babel backend for Lean 4 blocks
+(package! ob-lean4
+  :recipe (:host github
+           :repo "Maverobot/ob-lean4"))
+
+
 ;; To install a package directly from a remote git repo, you must specify a
 ;; `:recipe'. You'll find documentation on what `:recipe' accepts here:
 ;; https://github.com/radian-software/straight.el#the-recipe-format
