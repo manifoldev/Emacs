@@ -29,6 +29,10 @@
 ;; refresh your font settings. If Emacs still can't find your font, it likely
 ;; wasn't installed correctly. Font issues are rarely Doom issues!
 
+;; Fix for WSL
+(if (and (getenv "PATH") (string-match-p "Windows" (getenv "PATH")))
+    (setq default-frame-alist
+          (append default-frame-alist '((inhibit-double-buffering . t)))))
 
 ;; Enable fragtog mode
 (add-hook 'org-mode-hook 'org-fragtog-mode)
